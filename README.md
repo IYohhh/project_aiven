@@ -38,6 +38,12 @@ npm install
 cp .env.local.example .env.local
 ```
 
+Di Windows PowerShell, perintah salin yang setara:
+
+```powershell
+Copy-Item .env.local.example .env.local
+```
+
 Isi `.env.local` dengan kredensial Aiven kamu:
 
 ```
