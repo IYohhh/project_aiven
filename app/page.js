@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-const emptyForm = { name: '', description: '', price: '' };
+const emptyForm = { name: '', category: '', description: '', price: '' };
 
 export default function Home() {
   const [products, setProducts] = useState([]);
@@ -16,9 +16,9 @@ export default function Home() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/products');
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Gagal memuat data');
+      const response = await fetch('/api/products');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Gagal memuat produk');
       setProducts(data);
     } catch (err) {
       setError(err.message);
@@ -31,15 +31,16 @@ export default function Home() {
     loadProducts();
   }, []);
 
-  function handleChange(e) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+  function handleChange(event) {
+    const { name, value } = event.target;
+    setForm((previous) => ({ ...previous, [name]: value }));
   }
 
   function startEdit(product) {
     setEditingId(product.id);
     setForm({
       name: product.name,
+      category: product.category || '',
       description: product.description || '',
       price: product.price,
     });
@@ -50,22 +51,21 @@ export default function Home() {
     setForm(emptyForm);
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleSubmit(event) {
+    event.preventDefault();
     setSaving(true);
     setError('');
     try {
-      const url = editingId ? `/api/products/${editingId}` : '/api/products';
-      const method = editingId ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan data');
+      const response = await fetch(
+        editingId ? `/api/products/${editingId}` : '/api/products',
+        {
+          method: editingId ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Gagal menyimpan data');
 
       setForm(emptyForm);
       setEditingId(null);
@@ -81,9 +81,11 @@ export default function Home() {
     if (!confirm('Yakin ingin menghapus produk ini?')) return;
     setError('');
     try {
-      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Gagal menghapus data');
+      const response = await fetch(`/api/products/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Gagal menghapus data');
       await loadProducts();
     } catch (err) {
       setError(err.message);
@@ -109,6 +111,18 @@ export default function Home() {
               onChange={handleChange}
               placeholder="Misal: Kopi Susu"
               required
+            />
+          </div>
+
+          <div className="form-row">
+            <label htmlFor="category">Kategori</label>
+            <input
+              id="category"
+              name="category"
+              value={form.category}
+              onChange={handleChange}
+              placeholder="Misal: Makanan"
+              maxLength={100}
             />
           </div>
 
@@ -144,7 +158,11 @@ export default function Home() {
               {saving ? 'Menyimpan...' : editingId ? 'Update' : 'Simpan'}
             </button>
             {editingId && (
-              <button type="button" className="btn-secondary" onClick={cancelEdit}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={cancelEdit}
+              >
                 Batal
               </button>
             )}
@@ -160,22 +178,30 @@ export default function Home() {
         <thead>
           <tr>
             <th>Nama</th>
+            <th>Kategori</th>
             <th>Deskripsi</th>
             <th>Harga</th>
             <th>Aksi</th>
           </tr>
         </thead>
         <tbody>
-          {products.map((p) => (
-            <tr key={p.id}>
-              <td>{p.name}</td>
-              <td>{p.description}</td>
-              <td>Rp {Number(p.price).toLocaleString('id-ID')}</td>
+          {products.map((product) => (
+            <tr key={product.id}>
+              <td>{product.name}</td>
+              <td>{product.category || '-'}</td>
+              <td>{product.description}</td>
+              <td>Rp {Number(product.price).toLocaleString('id-ID')}</td>
               <td>
-                <button className="btn-edit" onClick={() => startEdit(p)}>
+                <button
+                  className="btn-edit"
+                  onClick={() => startEdit(product)}
+                >
                   Edit
                 </button>
-                <button className="btn-danger" onClick={() => handleDelete(p.id)}>
+                <button
+                  className="btn-danger"
+                  onClick={() => handleDelete(product.id)}
+                >
                   Hapus
                 </button>
               </td>
@@ -185,7 +211,9 @@ export default function Home() {
       </table>
 
       {!loading && products.length === 0 && (
-        <div className="empty">Belum ada produk. Tambahkan produk pertama di atas.</div>
+        <div className="empty">
+          Belum ada produk. Tambahkan produk pertama di atas.
+        </div>
       )}
     </main>
   );

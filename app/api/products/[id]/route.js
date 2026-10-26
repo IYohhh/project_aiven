@@ -5,9 +5,10 @@ import { getPool } from '@/lib/db';
 export async function GET(request, { params }) {
   try {
     const pool = getPool();
-    const [rows] = await pool.query('SELECT * FROM products WHERE id = ?', [
-      params.id,
-    ]);
+    const [rows] = await pool.query(
+      'SELECT id, name, category, description, price, created_at FROM products WHERE id = ?',
+      [params.id]
+    );
 
     if (rows.length === 0) {
       return NextResponse.json({ error: 'Produk tidak ditemukan' }, { status: 404 });
@@ -25,6 +26,15 @@ export async function PUT(request, { params }) {
   try {
     const body = await request.json();
     const { name, description, price } = body;
+    const category =
+      typeof body.category === 'string' ? body.category.trim() : '';
+
+    if (category.length > 100) {
+      return NextResponse.json(
+        { error: 'Kategori maksimal 100 karakter' },
+        { status: 400 }
+      );
+    }
 
     if (!name || price === undefined || price === '') {
       return NextResponse.json(
@@ -35,15 +45,21 @@ export async function PUT(request, { params }) {
 
     const pool = getPool();
     const [result] = await pool.query(
-      'UPDATE products SET name = ?, description = ?, price = ? WHERE id = ?',
-      [name, description || null, price, params.id]
+      'UPDATE products SET name = ?, category = ?, description = ?, price = ? WHERE id = ?',
+      [name, category || null, description || null, price, params.id]
     );
 
     if (result.affectedRows === 0) {
       return NextResponse.json({ error: 'Produk tidak ditemukan' }, { status: 404 });
     }
 
-    return NextResponse.json({ id: Number(params.id), name, description, price });
+    return NextResponse.json({
+      id: Number(params.id),
+      name,
+      category: category || null,
+      description,
+      price,
+    });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });

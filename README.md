@@ -1,112 +1,94 @@
 # CRUD Produk — Next.js + MySQL (Aiven) + Vercel
 
-Aplikasi CRUD sederhana (Create, Read, Update, Delete) untuk data "produk",
-dibangun dengan Next.js App Router dan database MySQL, siap deploy ke Vercel
-dengan database di Aiven.
+Aplikasi CRUD produk dengan Next.js App Router dan database MySQL. Kategori
+diisi langsung pada form produk; tidak ada halaman terpisah untuk mengelola
+kategori.
 
 ## Struktur Project
 
-```
+```text
 app/
   api/products/route.js         -> GET (list), POST (create)
   api/products/[id]/route.js    -> GET (detail), PUT (update), DELETE
   page.js                       -> Halaman utama (tabel + form)
   layout.js
   globals.css
-lib/
-  db.js                         -> Koneksi pool MySQL (support SSL Aiven)
-schema.sql                      -> Skema tabel `products`
+lib/db.js                       -> Koneksi pool MySQL dengan SSL Aiven
+migrations/002_remove_categories.sql -> Hapus tabel/kolom kategori lama
+migrations/003_add_product_category.sql -> Tambah kategori pada tabel products
+schema.sql                      -> Skema tabel products
 .env.local.example              -> Contoh environment variables
 ```
 
-## 1. Buat Database di Aiven
+## Menyiapkan Database MySQL
 
-1. Login ke https://aiven.io lalu buat service baru → pilih **MySQL** → plan **Free**.
-2. Pilih region terdekat, tunggu status menjadi "Running".
-3. Buka tab **Overview**, catat: `Host`, `Port`, `User` (biasanya `avnadmin`), `Password`, `Database name` (default `defaultdb`).
-4. Download **CA Certificate** (`ca.pem`) dari halaman yang sama.
-5. Buat tabelnya. Bisa lewat Aiven Console (query editor) atau CLI MySQL:
-   ```bash
-   mysql --host=<HOST> --port=<PORT> --user=<USER> --password=<PASSWORD> \
-     --database=<DBNAME> --ssl-mode=REQUIRED < schema.sql
-   ```
+Di Aiven, buat service MySQL dan tunggu sampai statusnya **Running**. Dari
+halaman **Overview**, salin host, port, user, password, dan nama database persis
+seperti yang ditampilkan. Host yang dipakai harus hostname service Aiven, bukan
+URL aplikasi atau alamat tebakan.
 
-## 2. Setup Project Secara Lokal
-
-```bash
-npm install
-cp .env.local.example .env.local
-```
-
-Di Windows PowerShell, perintah salin yang setara:
+Untuk database baru, jalankan `schema.sql` melalui Aiven Query Editor atau
+MySQL CLI:
 
 ```powershell
+Get-Content .\schema.sql | mysql --host=<HOST> --port=<PORT> --user=<USER> --password --ssl-mode=REQUIRED --database=<DBNAME>
+```
+
+Jika database lama sudah memakai fitur kategori, jalankan migrasi ini satu kali
+melalui Aiven Query Editor atau MySQL CLI:
+
+```powershell
+Get-Content .\migrations\002_remove_categories.sql | mysql --host=<HOST> --port=<PORT> --user=<USER> --password --ssl-mode=REQUIRED --database=<DBNAME>
+```
+
+Migrasi tersebut menghapus foreign key, kolom `products.category_id`, dan
+tabel `categories`. Produk yang sudah ada tetap tersimpan. Setelah itu jalankan
+migrasi `migrations/003_add_product_category.sql` untuk menambahkan kolom teks
+`category` pada produk. Jika database baru dibuat dari `schema.sql`, kedua
+migrasi tidak perlu dijalankan.
+
+## Menjalankan Secara Lokal
+
+Jalankan dari folder yang berisi `package.json`:
+
+```powershell
+npm install
 Copy-Item .env.local.example .env.local
 ```
 
-Isi `.env.local` dengan kredensial Aiven kamu:
+Isi `.env.local` dengan nilai dari Aiven:
 
-```
-DB_HOST=your-service.aivencloud.com
-DB_PORT=xxxxx
-DB_USER=avnadmin
-DB_PASSWORD=xxxxx
-DB_NAME=defaultdb
-DB_CA_CERT=<base64 dari ca.pem>
-```
-
-Generate nilai `DB_CA_CERT` dari file `ca.pem` yang tadi didownload:
-
-```bash
-base64 -i ca.pem | tr -d '\n'
+```text
+DB_HOST=<hostname dari Overview Aiven>
+DB_PORT=<port dari Overview Aiven>
+DB_USER=<user dari Overview Aiven>
+DB_PASSWORD=<password dari Aiven>
+DB_NAME=<nama database dari Aiven>
+DB_CA_CERT=<isi sertifikat CA dalam format base64>
 ```
 
-Copy hasilnya (satu baris panjang) ke `.env.local`.
+`DB_CA_CERT` berisi konten file CA certificate Aiven yang di-encode ke base64
+dalam satu baris. Setelah memperbarui `.env.local`, restart server development:
 
-Jalankan secara lokal:
-
-```bash
+```powershell
 npm run dev
 ```
 
-Buka http://localhost:3000 — kamu akan melihat form tambah produk dan tabel daftar produk.
+Buka alamat lokal yang ditampilkan di terminal. Jika muncul `getaddrinfo
+ENOTFOUND`, hostname `DB_HOST` tidak dapat ditemukan oleh DNS. Salin ulang
+hostname persis dari **Aiven → service MySQL → Overview**, pastikan servicenya
+berstatus **Running**, lalu restart server.
 
-## 3. Push ke GitHub
+## Deploy ke Vercel
 
-```bash
-git init
-git add .
-git commit -m "Initial commit: CRUD produk Next.js + MySQL"
-git branch -M main
-git remote add origin https://github.com/username/nama-repo.git
-git push -u origin main
-```
-
-Pastikan `.env.local` **tidak** ikut ter-commit (sudah otomatis diabaikan lewat `.gitignore`).
-
-## 4. Deploy ke Vercel
-
-1. Login ke https://vercel.com dengan akun GitHub.
-2. Klik **Add New → Project**, pilih repo yang baru saja di-push.
-3. Di bagian **Environment Variables**, tambahkan variabel yang sama persis seperti di `.env.local`:
-   - `DB_HOST`
-   - `DB_PORT`
-   - `DB_USER`
-   - `DB_PASSWORD`
-   - `DB_NAME`
-   - `DB_CA_CERT`
-4. Klik **Deploy**.
-5. Setelah selesai, buka URL yang diberikan Vercel (`https://nama-project.vercel.app`) — aplikasi CRUD sudah bisa dipakai.
+Tambahkan `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, dan
+`DB_CA_CERT` sebagai Environment Variables di project Vercel. Untuk database
+yang sudah memakai kategori, jalankan migrasi `migrations/002_remove_categories.sql`
+terlebih dahulu. Setelah itu deploy project.
 
 ## Fitur
 
-- **Create**: tambah produk baru lewat form (nama, deskripsi, harga)
-- **Read**: daftar semua produk otomatis dimuat saat halaman dibuka
-- **Update**: klik "Edit" pada baris produk untuk mengubah data
-- **Delete**: klik "Hapus" untuk menghapus produk (dengan konfirmasi)
-
-## Catatan
-
-- Free tier Aiven MySQL bisa nonaktif otomatis setelah periode idle tertentu — kamu akan mendapat notifikasi email sebelum itu terjadi.
-- Kalau ingin menambah kolom atau tabel baru, cukup ubah `schema.sql` dan sesuaikan query di `app/api/products/`.
-- Untuk validasi input yang lebih ketat atau autentikasi (login admin), beri tahu saya — bisa ditambahkan.
+- **Create**: tambah produk dengan nama, kategori, deskripsi, dan harga
+- **Read**: daftar produk dimuat saat halaman dibuka
+- **Update**: edit produk beserta kategorinya
+- **Delete**: hapus produk dengan konfirmasi
